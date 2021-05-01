@@ -16,19 +16,19 @@ Andrew Rabinovich
 We provide a [Colab Notebook](https://colab.research.google.com/drive/19_kJSkrQqPhQGIWpEpbZlk48b8p5ZRTO?usp=sharing) to try inference.
 
 ## Installation
-We provide a docker image `Docker/Dockerfile` with all the dependencies.
-
-Or you can install them yourself:
+The original instruction in [Atlas](https://github.com/magicleap/Atlas.git) is not suitable for gpu cluster with RTX 3090. Follows are the updated instruction:
 ```
-conda install -y pytorch=1.5.0 torchvision=0.6.0 cudatoolkit=10.2 -c pytorch
+conda create --name env_3drecon python=3.7
+conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge
 conda install opencv
+conda install scikit-image
 pip install \
-  open3d>=0.10.0.0 \
-  trimesh>=3.7.6 \
-  pyquaternion>=0.9.5 \
-  pytorch-lightning>=0.8.5 \
-  pyrender>=0.1.43
-python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu102/torch1.5/index.html
+  open3d==0.12.0 \
+  trimesh==3.9.15 \
+  pyquaternion==0.9.9 \
+  pytorch-lightning==1.2.10 \
+  pyrender==0.1.45
+python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu111/torch1.8/index.html
 ```
 For 16bit mixed precision (default training setting) you will also need [NVIDIA apex](https://github.com/NVIDIA/apex)
 ```
