@@ -31,9 +31,53 @@ import atlas.transforms as transforms
 from atlas.tsdf import TSDFFusion, TSDF, coordinates, depth_to_world
 
 
-def fuse_scene(path_meta, scene, voxel_size, trunc_ratio=3, max_depth=3,
-               vol_prcnt=.995, vol_margin=1.5, fuse_semseg=False, device=0,
-               verbose=2):
+def load_scene(path_meta, scene, max_depth=3, vol_prcnt=.995, vol_margin=1.5,
+               fuse_semseg=False, device=0, verbose=2):
+    if verbose>0:
+        print('preparing data', scene)
+    info_file = os.path.join(path_meta, scene, 'info.json')
+
+    # get gpu device for this worker
+    device = torch.device('cuda', device)  # gpu for this process
+
+    # get the dataset
+    transform = transforms.Compose([transforms.ResizeImage((640, 480)),
+                                    transforms.ToTensor(),
+                                    transforms.InstanceToSemseg('nyu40'),
+                                    transforms.IntrinsicsPoseToProjection(),
+                                    ])
+    frame_types = ['depth', 'semseg'] if fuse_semseg else ['depth']
+    dataset = SceneDataset(info_file, transform, frame_types)
+
+    # find volume bounds and origin by backprojecting depth maps to point clouds
+    # use a subset of the frames to save time
+    if len(dataset) <= 200:
+        dataset1 = dataset
+    else:
+        inds = np.linspace(0, len(dataset) - 1, 200).astype(int)
+        dataset1 = torch.utils.data.Subset(dataset, inds)
+    dataloader1 = torch.utils.data.DataLoader(dataset1, batch_size=None,
+                                              batch_sampler=None, num_workers=0)
+
+    pts = []
+    for i, frame in enumerate(dataloader1):
+        if verbose>1 and i%50==0:
+            print(scene, 'backoprojecting depth maps to point clouds', i, len(dataset))
+        projection = frame['projection'].to(device)
+        depth = frame['depth'].to(device)
+        depth[depth>max_depth]=0
+        pts.append(depth_to_world(projection, depth).view(3,-1).T)
+    pts = torch.cat(pts)
+    pts = pts[torch.isfinite(pts[:,0])].cpu().numpy()
+    # use top and bottom vol_prcnt of points plus vol_margin
+    origin = torch.as_tensor(np.quantile(pts, 1-vol_prcnt, axis=0)-vol_margin).float()
+    vol_max = torch.as_tensor(np.quantile(pts, vol_prcnt, axis=0)+vol_margin).float()
+
+    return info_file, device, dataset, origin, vol_max
+
+
+def fuse_scene(path_meta, scene, info_file, dataset, voxel_size, device, origin, vol_max,
+               trunc_ratio=3, max_depth=3, fuse_semseg=False, verbose=2):
     """ Use TSDF fusion with GT depth maps to generate GT TSDFs
 
     Args:
@@ -64,43 +108,6 @@ def fuse_scene(path_meta, scene, voxel_size, trunc_ratio=3, max_depth=3,
     if verbose>0:
         print('fusing', scene, 'voxel size', voxel_size)
 
-    info_file = os.path.join(path_meta, scene, 'info.json')
-
-    # get gpu device for this worker
-    device = torch.device('cuda', device) # gpu for this process
-
-    # get the dataset
-    transform = transforms.Compose([transforms.ResizeImage((640,480)),
-                                    transforms.ToTensor(),
-                                    transforms.InstanceToSemseg('nyu40'),
-                                    transforms.IntrinsicsPoseToProjection(),
-                                  ])
-    frame_types=['depth', 'semseg'] if fuse_semseg else ['depth']
-    dataset = SceneDataset(info_file, transform, frame_types)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=None,
-                                             batch_sampler=None, num_workers=4)
-
-    # find volume bounds and origin by backprojecting depth maps to point clouds
-    # use a subset of the frames to save time
-    if len(dataset)<=200:
-        dataset1 = dataset
-    else:
-        inds = np.linspace(0,len(dataset)-1,200).astype(np.int)
-        dataset1 = torch.utils.data.Subset(dataset, inds)
-    dataloader1 = torch.utils.data.DataLoader(dataset1, batch_size=None,
-                                              batch_sampler=None, num_workers=4)
-
-    pts = []
-    for i, frame in enumerate(dataloader1):
-        projection = frame['projection'].to(device)
-        depth = frame['depth'].to(device)
-        depth[depth>max_depth]=0
-        pts.append( depth_to_world(projection, depth).view(3,-1).T )
-    pts = torch.cat(pts)
-    pts = pts[torch.isfinite(pts[:,0])].cpu().numpy()
-    # use top and bottom vol_prcnt of points plus vol_margin
-    origin = torch.as_tensor(np.quantile(pts, 1-vol_prcnt, axis=0)-vol_margin).float()
-    vol_max = torch.as_tensor(np.quantile(pts, vol_prcnt, axis=0)+vol_margin).float()
     vol_dim = ((vol_max-origin)/(float(voxel_size)/100)).int().tolist()
 
 
@@ -108,9 +115,12 @@ def fuse_scene(path_meta, scene, voxel_size, trunc_ratio=3, max_depth=3,
     tsdf_fusion = TSDFFusion(vol_dim, float(voxel_size)/100, origin,
                              trunc_ratio, device, label=fuse_semseg)
 
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=None,
+                                             batch_sampler=None, num_workers=0)
+
     # integrate frames
     for i, frame in enumerate(dataloader):
-        if verbose>1 and i%25==0:
+        if verbose>1 and i%50==0:
             print(scene, 'integrating voxel size', voxel_size, i, len(dataset))
 
         projection = frame['projection'].to(device)
@@ -141,7 +151,7 @@ def fuse_scene(path_meta, scene, voxel_size, trunc_ratio=3, max_depth=3,
 
 
 # use labeled mesh to label surface voxels in tsdf
-def label_scene(path_meta, scene, voxel_size, dist_thresh=.05, verbose=2):
+def label_scene(scene, info_file, voxel_size, dist_thresh=.05, verbose=2):
     """ Transfer instance labels from ground truth mesh to TSDF
 
     For each voxel find the nearest vertex and transfer the label if
@@ -163,9 +173,8 @@ def label_scene(path_meta, scene, voxel_size, dist_thresh=.05, verbose=2):
     # dist_thresh: beyond this distance to nearest gt mesh vertex, 
     # voxels are not labeled
     if verbose>0:
-        print('labeling', scene)
+        print('labeling', scene, 'voxel size', voxel_size)
 
-    info_file = os.path.join(path_meta, scene, 'info.json')
     data = load_info_json(info_file)
 
     # each vertex in gt mesh indexs a seg group
@@ -252,10 +261,11 @@ def prepare_scannet(path, path_meta, i=0, n=1, test_only=False, max_depth=3):
 
     for scene in scenes:
         prepare_scannet_scene(scene, path, path_meta)
+        info_file, device, dataset, origin, vol_max = load_scene(path_meta, scene, device=i%8, max_depth=max_depth)
         for voxel_size in [4,8,16]:
-            fuse_scene(path_meta, scene, voxel_size, device=i%8, max_depth=max_depth)
+            fuse_scene(path_meta, scene, info_file, dataset, voxel_size, device, origin, vol_max, max_depth=max_depth)
             if scene.split('/')[0]=='scans':
-                label_scene(path_meta, scene, voxel_size)
+                label_scene(scene, info_file, voxel_size)
 
 
 
@@ -309,6 +319,12 @@ if __name__ == "__main__":
         help="path to store processed (derived) dataset")
     parser.add_argument("--dataset", required=True, type=str,
         help="which dataset to prepare")
+    # parser.add_argument("--path", default='/ssd/nzhao/data/',
+    #     help="path to raw dataset")
+    # parser.add_argument("--path_meta", default='/data/nzhao/workspace/Atlas/data_meta/',
+    #     help="path to store processed (derived) dataset")
+    # parser.add_argument("--dataset", type=str, default='scannet',
+    #     help="which dataset to prepare")
     parser.add_argument('--i', default=0, type=int,
         help='index of part for parallel processing')
     parser.add_argument('--n', default=1, type=int,

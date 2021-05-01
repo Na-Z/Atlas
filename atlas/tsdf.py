@@ -336,7 +336,10 @@ class TSDFFusion():
         nx, ny, nz = voxel_dim
         self.voxel_dim = voxel_dim
         self.voxel_size = voxel_size
-        self.origin = torch.tensor(origin, dtype=torch.float, device=device).view(1,3)
+        if torch.is_tensor(origin):
+            self.origin = origin.to(device).view(1,3)
+        else:
+            self.origin = torch.tensor(origin, dtype=torch.float, device=device).view(1,3)
         self.trunc_margin = voxel_size * trunc_ratio
         self.device = device
         coords = coordinates(voxel_dim, device)
@@ -387,7 +390,9 @@ class TSDFFusion():
         valid = (px >= 0) & (py >= 0) & (px < width) & (py < height) & (pz>0) # (nx*ny*nz)
 
         # voxels with valid depth
-        valid[valid] *= depth[py[valid], px[valid]]>0
+        valid_clone = valid.clone()
+        valid[valid_clone] = valid_clone[valid_clone] * depth[py[valid_clone], px[valid_clone]]>0
+        # valid[valid] *= depth[py[valid], px[valid]]>0
 
         # tsdf distance
         dist = pz[valid] - depth[py[valid], px[valid]] # (n1) (where n1 is # of in valid voxels)
@@ -395,7 +400,9 @@ class TSDFFusion():
 
         # mask out voxels beyond trucaction distance behind surface
         valid1 = dist<1
-        valid[valid] *= valid1
+        valid_clone = valid.clone()
+        valid[valid_clone] = valid_clone[valid_clone] * valid1
+        # valid[valid] *= valid1
         dist = dist[valid1] # (n2) (where n2 is # of valid1 voxels)
 
         # where weight=0 copy in new values
