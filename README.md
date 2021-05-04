@@ -19,16 +19,16 @@ We provide a [Colab Notebook](https://colab.research.google.com/drive/19_kJSkrQq
 The original instruction in [Atlas](https://github.com/magicleap/Atlas.git) is not suitable for gpu cluster with RTX 3090. Follows are the updated instruction:
 ```
 conda create --name env_3drecon python=3.7
-conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge
+conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 cudatoolkit=11.1 -c pytorch -c conda-forge
 conda install opencv
-conda install scikit-image
 pip install \
   open3d==0.12.0 \
   trimesh==3.9.15 \
   pyquaternion==0.9.9 \
   pytorch-lightning==1.2.10 \
-  pyrender==0.1.45
-python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu111/torch1.8/index.html
+  pyrender==0.1.45 \
+  scikit-image
+python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 ```
 For 16bit mixed precision (default training setting) you will also need [NVIDIA apex](https://github.com/NVIDIA/apex)
 ```

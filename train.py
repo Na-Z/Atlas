@@ -58,7 +58,8 @@ if __name__ == "__main__":
         benchmark=True,
         gpus=cfg.TRAINER.NUM_GPUS,
         precision=cfg.TRAINER.PRECISION,
-        amp_level='O1')
+        amp_level='O0',
+        use_amp=False)
     
     trainer.fit(model)
 

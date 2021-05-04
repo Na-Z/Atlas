@@ -25,7 +25,7 @@ import trimesh
 
 from atlas.data import SceneDataset, load_info_json
 from atlas.datasets.scannet import prepare_scannet_scene, prepare_scannet_splits
-from atlas.datasets.rio import prepare_rio_scene
+# from atlas.datasets.rio import prepare_rio_scene
 from atlas.datasets.sample import prepare_sample_scene
 import atlas.transforms as transforms
 from atlas.tsdf import TSDFFusion, TSDF, coordinates, depth_to_world
@@ -57,7 +57,7 @@ def load_scene(path_meta, scene, max_depth=3, vol_prcnt=.995, vol_margin=1.5,
         inds = np.linspace(0, len(dataset) - 1, 200).astype(int)
         dataset1 = torch.utils.data.Subset(dataset, inds)
     dataloader1 = torch.utils.data.DataLoader(dataset1, batch_size=None,
-                                              batch_sampler=None, num_workers=0)
+                                              batch_sampler=None, num_workers=4)
 
     pts = []
     for i, frame in enumerate(dataloader1):
@@ -116,7 +116,7 @@ def fuse_scene(path_meta, scene, info_file, dataset, voxel_size, device, origin,
                              trunc_ratio, device, label=fuse_semseg)
 
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=None,
-                                             batch_sampler=None, num_workers=0)
+                                             batch_sampler=None, num_workers=4)
 
     # integrate frames
     for i, frame in enumerate(dataloader):
@@ -319,9 +319,9 @@ if __name__ == "__main__":
         help="path to store processed (derived) dataset")
     parser.add_argument("--dataset", required=True, type=str,
         help="which dataset to prepare")
-    # parser.add_argument("--path", default='/ssd/nzhao/data/',
+    # parser.add_argument("--path", default='./data/',
     #     help="path to raw dataset")
-    # parser.add_argument("--path_meta", default='/data/nzhao/workspace/Atlas/data_meta/',
+    # parser.add_argument("--path_meta", default='./data_meta/',
     #     help="path to store processed (derived) dataset")
     # parser.add_argument("--dataset", type=str, default='scannet',
     #     help="which dataset to prepare")
