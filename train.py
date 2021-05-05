@@ -45,7 +45,7 @@ if __name__ == "__main__":
     save_path = os.path.join(cfg.LOG_DIR, cfg.TRAINER.NAME, cfg.TRAINER.VERSION)
     logger = AtlasLogger(cfg.LOG_DIR, cfg.TRAINER.NAME, cfg.TRAINER.VERSION)
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filepath=os.path.join(save_path, '{epoch:03d}'),
+        dirpath=os.path.join(save_path, '{epoch:03d}'),
         save_top_k=-1,
         period=cfg.TRAINER.CHECKPOINT_PERIOD)
 

@@ -23,7 +23,7 @@ import torch
 import trimesh
 
 from atlas.tsdf import TSDF
-import atlas.transforms
+# import atlas.transforms
 
 DEPTH_SHIFT = 1000
 
