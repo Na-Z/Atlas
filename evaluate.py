@@ -18,6 +18,7 @@
 import argparse
 import json
 import os
+os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 
 import numpy as np
 import pyrender

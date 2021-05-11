@@ -72,6 +72,8 @@ pip install \
   pyquaternion==0.9.9 \
   pytorch-lightning==1.2.10 \
   pyrender==0.1.45 \
+  PyOpenGL_accelerate==3.1.5 \ 
+  PyOpenGL_accelerate==3.1.5 \ 
   scikit-image
 python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu102/torch1.5/index.html
 ```
@@ -90,3 +92,40 @@ python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wh
     3. ModuleNotFoundError: You set `use_amp=True` but do not have apex installed.
         > Install apex first using this guide and rerun with use_amp=True:https://github.com/NVIDIA/apex#linux his run will NOT use 16 bit precision
         - [x] Can not install apex successfully. Final solution: set `use_amp=False`.
+    4. When running `evaluate.py`, raise `raise NoSuchDisplayException` issue. The error info is "pyglet.canvas.xlib.NoSuchDisplayException: Cannot connect to "None""
+        - [x] Add `os.environ['PYOPENGL_PLATFORM'] = 'egl'` in `evaluate.py` 
+    5. After that, get another issue: `TypeError: startswith first arg must be bytes or a tuple of bytes, not str`.
+        This may due to thw NVIDIA Driver and OpenGL during rendering. Potential solution can be modify the `GL` to `OpenGL` in `egl.py` under `OpenGL/platform`. Pls refer to this discussion [Headless rendering with nvidia and using libOpenGL.so](https://github.com/mcfletch/pyopengl/issues/27).
+        
+## 
+Setup env with docker 
+1. Build image from Dockerfile:
+    ```
+    docker build --tag atlas-docker - < Dockerfile 
+    ```
+2. Run the image as a container:
+    + To initialize a container with name `atlas-docker` based on docker image `atlas-docker` in the foreground mode.  
+        ```
+        docker run --gpus all -it -p [host port]:[container port] --name atlas-container --mount type=bind,source="/storage_fast/nzhao/workspace/Atlas",target=/Atlas atlas-docker /bin/bash
+        ```
+        By default, the container port is `5000`. 
+    + Use `docker ps -a` to list all the container info. Since the container is running in foreground mode, make sure tmux is open when run the container.
+    + Use `Ctrl+D` or `exit` to close container.
+    + To restart an existing container:
+        ```
+        docker restart atlas-container
+        ```  
+    + To execute an interactive bash shell on the container:
+       ```
+       docker exec -it atlas-container /bin/bash
+       ```
+    + To exit container without stopping process, enter `Ctrl+p` then `Ctrl+q`.
+    
+3. Install dependencies:
+    ```
+    sudo apt install htop libusb-1.0-0
+    ```  
+    The reason to install `libusb-1.0-0` is because it is needed when importing `open3d`. 
+4. Set `os.environ["PYOPENGL_PLATFORM"] = "osmesa"` to solve the bug `pyglet.canvas.xlib.NoSuchDisplayException: Cannot connect to "None"` when running `evaluate.py`.
+     
+Refer to [here](https://docs.docker.com/language/python/build-images/) fore more info on docker.

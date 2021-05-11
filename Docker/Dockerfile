@@ -79,8 +79,8 @@ RUN pip install \
 RUN python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu102/torch1.5/index.html
 
 # For 16bit mixed precision
-RUN git clone https://github.com/NVIDIA/apex
-RUN pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./apex
+#RUN git clone https://github.com/NVIDIA/apex
+#RUN pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./apex
 
 # add headless support for pyrender
 # https://pyrender.readthedocs.io/en/latest/install/index.html
