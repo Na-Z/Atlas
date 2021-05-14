@@ -106,7 +106,7 @@ Setup env with docker
 2. Run the image as a container:
     + To initialize a container with name `atlas-docker` based on docker image `atlas-docker` in the foreground mode.  
         ```
-        docker run --gpus all -it -p [host port]:[container port] --name atlas-container --mount type=bind,source="/storage_fast/nzhao/workspace/Atlas",target=/Atlas atlas-docker /bin/bash
+        docker run --gpus all -it -p [host port]:[container port] --name atlas-container --mount type=bind,source="/storage_fast/nzhao/workspace/Atlas",target=/Atlas --privileged=true atlas-docker /bin/bash
         ```
         By default, the container port is `5000`. 
     + Use `docker ps -a` to list all the container info. Since the container is running in foreground mode, make sure tmux is open when run the container.
@@ -128,6 +128,11 @@ Setup env with docker
     The reason to install `libusb-1.0-0` is because it is needed when importing `open3d`. 
 4. Set `os.environ["PYOPENGL_PLATFORM"] = "osmesa"` to solve the bug `pyglet.canvas.xlib.NoSuchDisplayException: Cannot connect to "None"` when running `evaluate.py`.
 5. Downgrade the version of pytorch-lightning if its version is larger than 1.2.10.
+
+- [x] Solve the [docker file permission issue](https://medium.com/@mccode/understanding-how-uid-and-gid-work-in-docker-containers-c37a01d01cf) by:
+    + Create Dockerfile2
+    + Build another image layer: `docker build --tag atlas-docker-v2 - < Dockerfile2` 
+    + Run image as a container: `docker run --gpus all -it -p [host port]:[container port] --name atlas-container --mount type=bind,source="/storage_fast/nzhao/workspace/Atlas",target=/Atlas --privileged=true atlas-docker-v2 /bin/bash`
 
      
 Refer to [here](https://docs.docker.com/language/python/build-images/) fore more info on docker.
