@@ -127,5 +127,7 @@ Setup env with docker
     ```  
     The reason to install `libusb-1.0-0` is because it is needed when importing `open3d`. 
 4. Set `os.environ["PYOPENGL_PLATFORM"] = "osmesa"` to solve the bug `pyglet.canvas.xlib.NoSuchDisplayException: Cannot connect to "None"` when running `evaluate.py`.
+5. Downgrade the version of pytorch-lightning if its version is larger than 1.2.10.
+
      
 Refer to [here](https://docs.docker.com/language/python/build-images/) fore more info on docker.
